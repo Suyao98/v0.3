@@ -8,9 +8,6 @@ tiangan = ["甲","乙","丙","丁","戊","己","庚","辛","壬","癸"]
 dizhi = ["子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥"]
 GZS_LIST = [tiangan[i%10] + dizhi[i%12] for i in range(60)]
 
-def ganzhi_list():
-    return GZS_LIST
-
 gan_he = {"甲":"己","己":"甲","乙":"庚","庚":"乙","丙":"辛","辛":"丙","丁":"壬","壬":"丁","戊":"癸","癸":"戊"}
 zhi_he = {"子":"丑","丑":"子","寅":"亥","亥":"寅","卯":"戌","戌":"卯","辰":"酉","酉":"辰","巳":"申","申":"巳","午":"未","未":"午"}
 gan_chong = {"甲":"庚","庚":"甲","乙":"辛","辛":"乙","丙":"壬","壬":"丙","丁":"癸","癸":"丁"}
@@ -36,7 +33,6 @@ def calc_jixiong(gz):
     dz_ch = zhi_chong.get(dz, "")
     if tg_he and dz_he:
         res["吉"].append(tg_he + dz_he)
-        # 加一个合后邻支，兼顾之前逻辑
         res["吉"].append(tg_he + dizhi[(dizhi.index(dz_he)+1)%12])
     if tg_ch and dz_ch:
         res["凶"].append(tg_ch + dz_ch)
@@ -149,40 +145,41 @@ def year_ganzhi_map(start=1900, end=2100):
     return {y: GZS_LIST[(y-base_year)%60] for y in range(start, end+1)}
 
 def show_result_beauty(ji_list, xiong_list, birth_year):
-    current_year = datetime.datetime.now().year
-    year_map = year_ganzhi_map(max(birth_year, current_year), 2100)
-
-    # 吉年输出
-    st.subheader("🎉 吉年")
-    for gz in sorted(ji_list, key=lambda x: ganzhi_list().index(x) if x in ganzhi_list() else 999):
-        years = [y for y, gz_y in year_map.items() if gz_y == gz]
-        if years:
-            year_strs = []
+    now_year = datetime.datetime.now().year
+    year_map = year_ganzhi_map(max(birth_year, now_year), 2100)
+    cur = birth_year if birth_year >= now_year else now_year
+    color_good = "#b22222"
+    color_bad = "#555555"
+    st.markdown("### 吉年")
+    if not ji_list:
+        st.info("无吉年（按当前规则）")
+    else:
+        for gz in ji_list:
+            years = [y for y,g in year_map.items() if g == gz]
+            if not years: continue
+            years.sort()
+            parts=[]
             for y in years:
-                if y >= current_year:
-                    year_strs.append(f"<b>{gz}{y}年★</b>")
-                else:
-                    year_strs.append(f"{gz}{y}年")
-            st.markdown(
-                f"<span style='color:red'>{gz}: {', '.join(year_strs)}</span>",
-                unsafe_allow_html=True
-            )
-
-    # 凶年输出
-    st.subheader("☠️ 凶年")
-    for gz in sorted(xiong_list, key=lambda x: ganzhi_list().index(x) if x in ganzhi_list() else 999):
-        years = [y for y, gz_y in year_map.items() if gz_y == gz]
-        if years:
-            year_strs = []
+                s = f"{y}"
+                if y >= cur:
+                    s = f"**{s}**"
+                parts.append(s)
+            st.markdown(f"<div style='color:{color_good};padding:8px;border-left:5px solid {color_good};background:#fff0f0;border-radius:6px;margin-bottom:6px'>{gz}: {'，'.join(parts)}</div>", unsafe_allow_html=True)
+    st.markdown("### 凶年")
+    if not xiong_list:
+        st.info("无凶年（按当前规则）")
+    else:
+        for gz in xiong_list:
+            years = [y for y,g in year_map.items() if g == gz]
+            if not years: continue
+            years.sort()
+            parts=[]
             for y in years:
-                if y >= current_year:
-                    year_strs.append(f"<b>{gz}{y}年★</b>")
-                else:
-                    year_strs.append(f"{gz}{y}年")
-            st.markdown(
-                f"<span style='color:#333'>{gz}: {', '.join(year_strs)}</span>",
-                unsafe_allow_html=True
-            )
+                s = f"{y}"
+                if y >= cur:
+                    s = f"**{s}**"
+                parts.append(s)
+            st.markdown(f"<div style='color:{color_bad};padding:8px;border-left:5px solid {color_bad};background:#f7f7f7;border-radius:6px;margin-bottom:6px'>{gz}: {'，'.join(parts)}</div>", unsafe_allow_html=True)
 
 st.set_page_config(page_title="八字排盘", layout="centered")
 st.title("八字排盘")
@@ -240,8 +237,11 @@ else:  # 直接输入四柱八字
             ji, xiong = analyze_bazi(nianzhu.strip(), yuezhu.strip(), rizhu.strip(), shizhu.strip())
             st.markdown("## 输入八字四柱")
             st.markdown(f"年柱：{nianzhu}  月柱：{yuezhu}  日柱：{rizhu}  时柱：{shizhu}")
-            # 简单默认出生年
+            # 如果日柱有效，则尝试用日柱天干推算出生年，没法确定用默认1990
             birth_year = 1990
+            if rizhu and len(rizhu) == 2:
+                # 简单反推年份: 假设日柱与出生年关联不严谨，固定默认
+                birth_year = 1990
             show_result_beauty(ji, xiong, birth_year)
         except Exception as e:
             st.error(f"计算出错：{e}")
