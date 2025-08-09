@@ -1,407 +1,308 @@
+# -*- coding: utf-8 -*-
+import datetime
+from datetime import date, timedelta
 import streamlit as st
-from datetime import datetime, date
 
-# 天干、地支
-tiangan = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
-dizhi = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+# ========== 基础：干支、甲子表 ==========
+tiangan = ["甲","乙","丙","丁","戊","己","庚","辛","壬","癸"]
+dizhi = ["子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥"]
+GZS_LIST = [tiangan[i%10] + dizhi[i%12] for i in range(60)]
 
-# 五行映射
-wuxing_map = {
-    "甲": "木", "乙": "木",
-    "丙": "火", "丁": "火",
-    "戊": "土", "己": "土",
-    "庚": "金", "辛": "金",
-    "壬": "水", "癸": "水",
-    "子": "水", "丑": "土", "寅": "木", "卯": "木", "辰": "土",
-    "巳": "火", "午": "火", "未": "土", "申": "金", "酉": "金",
-    "戌": "土", "亥": "水"
-}
-
-# 立春时间（简化固定为2月4日 04:00，真实精度可用万年历替换）
-# 用于判定年柱边界，出生日期在立春前还是立春后决定年份干支
-lichun_month = 2
-lichun_day = 4
-lichun_hour = 4
-
-def is_after_lichun(y, m, d, h, minute):
-    if m > lichun_month:
-        return True
-    if m < lichun_month:
-        return False
-    if d > lichun_day:
-        return True
-    if d < lichun_day:
-        return False
-    if h > lichun_hour:
-        return True
-    if h < lichun_hour:
-        return False
-    if minute is None:
-        return True
-    return minute >= 0
-
-def leap_year(y):
-    return (y % 4 == 0 and y % 100 != 0) or (y % 400 == 0)
-
-def days_in_month(y, m):
-    if m in [1,3,5,7,8,10,12]:
-        return 31
-    elif m in [4,6,9,11]:
-        return 30
-    elif m == 2:
-        return 29 if leap_year(y) else 28
-    else:
-        return 30  # 防护
-
-# 六十甲子序列
 def ganzhi_list():
-    lst = []
-    for i in range(60):
-        lst.append(tiangan[i % 10] + dizhi[i % 12])
-    return lst
+    return GZS_LIST
 
-# 1984年1月1日甲午日（日干支锚点）
-base_year = 1984
-base_month = 1
-base_day = 1
-base_gz_day = "甲午"
-
-# 获取天干索引
-def tg_index(tg):
-    return tiangan.index(tg)
-
-def dz_index(dz):
-    return dizhi.index(dz)
-
-# 计算两个日期相差天数
-def days_between(y1,m1,d1,y2,m2,d2):
-    # 先用datetime计算天数差，更准确
-    date1 = date(y1,m1,d1)
-    date2 = date(y2,m2,d2)
-    return (date2 - date1).days
-
-# 计算年柱
-def get_year_ganzhi(year, month, day, hour=None, minute=None):
-    # 判断是否过立春
-    if hour is None:
-        hour = 0
-    if minute is None:
-        minute = 0
-    if not is_after_lichun(year, month, day, hour, minute):
-        year -= 1
-    offset = (year - 1984) % 60
-    gz = ganzhi_list()[offset]
-    return gz
-
-# 月支对应二十四节气时间简化版（以节气日为界，时间均以当日零点判断）
-# 寅月：立春—惊蛰(3月6日)
-# 卯月：惊蛰—清明(4月5日)
-# 辰月：清明—立夏(5月6日)
-# 巳月：立夏—芒种(6月6日)
-# 午月：芒种—小暑(7月7日)
-# 未月：小暑—立秋(8月8日)
-# 申月：立秋—白露(9月8日)
-# 酉月：白露—寒露(10月8日)
-# 戌月：寒露—立冬(11月7日)
-# 亥月：立冬—大雪(12月7日)
-# 子月：大雪—小寒(1月6日)
-# 丑月：小寒—立春(2月4日)
-
-jieqi_map = [
-    (2,4,"丑"),
-    (1,6,"子"),
-    (12,7,"亥"),
-    (11,7,"戌"),
-    (10,8,"酉"),
-    (9,8,"申"),
-    (8,8,"未"),
-    (7,7,"午"),
-    (6,6,"巳"),
-    (5,6,"辰"),
-    (4,5,"卯"),
-    (3,6,"寅"),
-]
-
-def get_month_dizhi(year, month, day):
-    # 判断属于哪个节气区间
-    # 注意这里用简单判断，以节气日期为界，时间不精确
-    m = month
-    d = day
-    for i in range(len(jieqi_map)):
-        mon, day_jq, zhi = jieqi_map[i]
-        if m == mon and d >= day_jq:
-            return zhi
-        if m == (mon % 12) + 1 and d < jieqi_map[(i+1)%len(jieqi_map)][1]:
-            return zhi
-    # 默认
-    return "丑"
-
-# 五虎遁月干对应表
-five_hu_dun = {
-    "甲": "丙",
-    "己": "丙",
-    "乙": "戊",
-    "庚": "戊",
-    "丙": "庚",
-    "辛": "庚",
-    "丁": "壬",
-    "壬": "壬",
-    "戊": "甲",
-    "癸": "甲",
+# 五行（按天干）
+WUXING_OF_GAN = {
+    "甲":"木","乙":"木",
+    "丙":"火","丁":"火",
+    "戊":"土","己":"土",
+    "庚":"金","辛":"金",
+    "壬":"水","癸":"水"
+}
+# 五行（按地支）
+WUXING_OF_DZ = {
+    "子":"水","丑":"土","寅":"木","卯":"木","辰":"土","巳":"火",
+    "午":"火","未":"土","申":"金","酉":"金","戌":"土","亥":"水"
 }
 
-def get_month_gan(year_gan, month_dz):
-    # 根据年干和月支推月干
-    start_gan = five_hu_dun.get(year_gan)
-    if start_gan is None:
-        start_gan = "甲"  # 默认
-    start_index = tiangan.index(start_gan)
-    dz_idx = dizhi.index(month_dz)
-    # 寅月对应dz_idx=2，正月，依次加数
-    offset = (dz_idx - 2) % 12
-    month_gan_idx = (start_index + offset) % 10
-    return tiangan[month_gan_idx]
-
-# 日柱推算（锚点法）
-def get_day_ganzhi(year, month, day):
-    base_tg = base_gz_day[0]
-    base_dz = base_gz_day[1]
-    days_diff = days_between(base_year, base_month, base_day, year, month, day)
-    tg_idx = (tg_index(base_tg) + days_diff) % 10
-    dz_idx = (dz_index(base_dz) + days_diff) % 12
-    return tiangan[tg_idx] + dizhi[dz_idx]
-
-# 时辰对应地支（2小时为一时辰）
-def get_shizhi(hour, minute):
-    # 23:00-0:59 属子时
-    total_minutes = hour * 60 + minute
-    # 定义时辰起始分钟，从23:00开始算
-    # 以23:00为0分钟，01:00为120分钟，依次类推
-    # 23:00-00:59为子时，01:00-02:59丑时...
-    if total_minutes >= 1380:  # 23*60
-        return "子"
-    elif total_minutes < 60:
-        return "子"
-    else:
-        # 1点之后就从60开始
-        offset = total_minutes - 60
-        idx = offset // 120 + 1  # 子时为0，丑时为1，依次类推
-        return dizhi[idx % 12]
-
-# 五鼠遁时干推算表，日干对应各时辰天干
-five_shu_dun = {
-    "甲": ["甲","乙","丙","丁","戊","己","庚","辛","壬","癸","甲","乙"],
-    "己": ["甲","乙","丙","丁","戊","己","庚","辛","壬","癸","甲","乙"],
-    "乙": ["丙","丁","戊","己","庚","辛","壬","癸","甲","乙","丙","丁"],
-    "庚": ["丙","丁","戊","己","庚","辛","壬","癸","甲","乙","丙","丁"],
-    "丙": ["戊","己","庚","辛","壬","癸","甲","乙","丙","丁","戊","己"],
-    "辛": ["戊","己","庚","辛","壬","癸","甲","乙","丙","丁","戊","己"],
-    "丁": ["庚","辛","壬","癸","甲","乙","丙","丁","戊","己","庚","辛"],
-    "壬": ["庚","辛","壬","癸","甲","乙","丙","丁","戊","己","庚","辛"],
-    "戊": ["壬","癸","甲","乙","丙","丁","戊","己","庚","辛","壬","癸"],
-    "癸": ["壬","癸","甲","乙","丙","丁","戊","己","庚","辛","壬","癸"]
+# 五行颜色
+WUXING_COLOR = {
+    "木": "#2e7d32",   # 绿
+    "火": "#d32f2f",   # 红
+    "土": "#8d6e63",   # 棕
+    "金": "#6e6e6e",   # 灰
+    "水": "#1565c0"    # 蓝
 }
 
-def get_shigan(day_gan, shizhi):
-    dz_idx = dizhi.index(shizhi)
-    return five_shu_dun[day_gan][dz_idx]
+# ========== 合/冲 规则 ==========
+gan_he = {"甲":"己","己":"甲","乙":"庚","庚":"乙","丙":"辛","辛":"丙","丁":"壬","壬":"丁","戊":"癸","癸":"戊"}
+gan_chong = {"甲":"庚","庚":"甲","乙":"辛","辛":"乙","丙":"壬","壬":"丙","丁":"癸","癸":"丁"}
+zhi_he = {"子":"丑","丑":"子","寅":"亥","亥":"寅","卯":"戌","戌":"卯","辰":"酉","酉":"辰","巳":"申","申":"巳","午":"未","未":"午"}
+zhi_chong = {dz: dizhi[(i+6)%12] for i, dz in enumerate(dizhi)}
 
-# 天干合（五合）和天干冲（四冲）
-gan_he = {
-    "甲": "己", "己": "甲",
-    "乙": "庚", "庚": "乙",
-    "丙": "辛", "辛": "丙",
-    "丁": "壬", "壬": "丁",
-    "戊": "癸", "癸": "戊"
-}
+def zhi_next(z): return dizhi[(dizhi.index(z)+1)%12]
+def zhi_prev(z): return dizhi[(dizhi.index(z)-1)%12]
 
-gan_chong = {
-    "甲": "庚", "庚": "甲",
-    "乙": "辛", "辛": "乙",
-    "丙": "壬", "壬": "丙",
-    "丁": "癸", "癸": "丁"
-}
+def unique_list(seq):
+    seen=set(); out=[]
+    for s in seq:
+        if s not in seen:
+            seen.add(s); out.append(s)
+    return out
 
-zhi_he = {
-    "子": "丑", "丑": "子",
-    "寅": "亥", "亥": "寅",
-    "卯": "戌", "戌": "卯",
-    "辰": "酉", "酉": "辰",
-    "巳": "申", "申": "巳",
-    "午": "未", "未": "午"
-}
-
-zhi_chong = {dz: dizhi[(i + 6) % 12] for i, dz in enumerate(dizhi)}
-
-# 计算吉凶
 def calc_jixiong(gz):
-    tg = gz[0]
-    dz = gz[1]
-    results = {"吉": [], "凶": []}
+    """按既定规则计算某柱的 吉/凶 干支（双合进一/双冲退一）"""
+    if not gz or len(gz) < 2:
+        return {"吉":[], "凶":[]}
+    tg, dz = gz[0], gz[1]
+    res = {"吉":[], "凶":[]}
     tg_he = gan_he.get(tg, "")
     dz_he = zhi_he.get(dz, "")
     tg_ch = gan_chong.get(tg, "")
     dz_ch = zhi_chong.get(dz, "")
-
     if tg_he and dz_he:
         shuang_he = tg_he + dz_he
-        jin_yi = tg_he + dizhi[(dizhi.index(dz_he) + 1) % 12]
-        results["吉"].extend([shuang_he, jin_yi])
+        jin_yi = tg_he + zhi_next(dz_he)
+        res["吉"].extend([shuang_he, jin_yi])
     if tg_ch and dz_ch:
         shuang_ch = tg_ch + dz_ch
-        tui_yi = tg_ch + dizhi[(dizhi.index(dz_ch) - 1) % 12]
-        results["凶"].extend([shuang_ch, tui_yi])
-    return results
+        tui_yi = tg_ch + zhi_prev(dz_ch)
+        res["凶"].extend([shuang_ch, tui_yi])
+    return res
 
-# 60甲子列表
-ganzhi60 = ganzhi_list()
+def analyze_bazi(year_zhu, month_zhu, day_zhu, time_zhu):
+    pillars = [p for p in (year_zhu, month_zhu, day_zhu) if p]
+    if time_zhu and str(time_zhu).strip() and str(time_zhu).strip().lower() not in ["不要","不要时","不知道"]:
+        pillars.append(time_zhu)
+    all_ji=[]; all_xiong=[]
+    for p in pillars:
+        r = calc_jixiong(p)
+        all_ji.extend(r["吉"]); all_xiong.extend(r["凶"])
+    return unique_list(all_ji), unique_list(all_xiong)
 
-# 年份干支映射
-def year_ganzhi_map(start=1900, end=2100):
-    base_year = 1984
-    result = {}
-    for y in range(start, end + 1):
-        idx = (y - base_year) % 60
-        result[y] = ganzhi60[idx]
-    return result
+# ========== 八字推算：锚点日法（1984-01-01 甲午） & 月柱/时柱规则 ==========
+ANCHOR_DATE = date(1984,1,1)
+ANCHOR_GZ = "甲午"
+ANCHOR_INDEX = GZS_LIST.index(ANCHOR_GZ)
 
-def colorize(char):
-    w = wuxing_map.get(char, "土")
-    color_dict = {
-        "木": "#228B22",
-        "火": "#FF4500",
-        "土": "#DAA520",
-        "金": "#1E90FF",
-        "水": "#00CED1",
-    }
-    return f"<span style='color:{color_dict[w]}; font-weight:bold'>{char}</span>"
-
-def main():
-    st.set_page_config(page_title="吉凶推算", layout="centered")
-
-    st.title("吉凶推算")
-
-    mode = st.radio("选择输入方式", ["阳历生日", "四柱八字"])
-
-    if mode == "阳历生日":
-        year = st.number_input("出生年份", min_value=1900, max_value=2100, value=1990)
-        month = st.text_input("出生月份（数字，例如5）", "1")
-        day = st.number_input("出生日", min_value=1, max_value=31, value=1)
-        hour = st.text_input("出生小时（0-23，未知可留空）", "")
-        minute = st.text_input("出生分钟（0-59，未知可留空）", "")
-
-        try:
-            month = int(month)
-            if hour.strip() == "":
-                hour_val = None
-            else:
-                hour_val = int(hour)
-                if not (0 <= hour_val <= 23):
-                    st.error("小时应在0-23之间")
-                    return
-            if minute.strip() == "":
-                minute_val = None
-            else:
-                minute_val = int(minute)
-                if not (0 <= minute_val <= 59):
-                    st.error("分钟应在0-59之间")
-                    return
-        except:
-            st.error("月份、小时、分钟应输入数字")
-            return
-
+def day_ganzhi_by_anchor(y,m,d,h=None):
+    if h is not None and h >= 23:
+        target = date(y,m,d) + timedelta(days=1)
     else:
-        year_zhu = st.text_input("年柱（例如：甲子）").strip()
-        month_zhu = st.text_input("月柱（例如：乙丑）").strip()
-        day_zhu = st.text_input("日柱（例如：丙寅）").strip()
-        time_zhu = st.text_input("时柱（例如：丁卯，未知可留空）").strip()
-        # 校验长度
-        if any(len(x) != 2 for x in [year_zhu, month_zhu, day_zhu]):
-            st.error("年柱、月柱、日柱必须为两个字符")
-            return
-        if time_zhu and len(time_zhu) != 2:
-            time_zhu = "未知"
-        if not time_zhu:
-            time_zhu = "未知"
+        target = date(y,m,d)
+    delta = (target - ANCHOR_DATE).days
+    idx = (ANCHOR_INDEX + delta) % 60
+    return GZS_LIST[idx]
 
-    if st.button("推算"):
-        if mode == "阳历生日":
-            nianzhu = get_year_ganzhi(year, month, day, hour_val, minute_val)
+def get_li_chun_datetime(year):
+    return datetime.datetime(year,2,4,0,0)
 
-            month_dz = get_month_dizhi(year, month, day)
-            yuegan = get_month_gan(nianzhu[0], month_dz)
-            yuezhu = yuegan + month_dz
+def year_ganzhi(year, month, day, hour=0, minute=0):
+    dt = datetime.datetime(year, month, day, hour, minute)
+    lichun = get_li_chun_datetime(year)
+    adj_year = year if dt >= lichun else year-1
+    return GZS_LIST[(adj_year - 1984) % 60], adj_year
 
-            rizhu = get_day_ganzhi(year, month, day)
+JIEQI = [
+    (2,4,"寅"), (3,6,"卯"), (4,5,"辰"), (5,6,"巳"), (6,6,"午"),
+    (7,7,"未"), (8,7,"申"), (9,7,"酉"), (10,8,"戌"), (11,7,"亥"),
+    (12,7,"子"), (1,6,"丑"),
+]
+def get_month_branch(year, month, day):
+    bd = date(year, month, day)
+    for i,(m,d,branch) in enumerate(JIEQI):
+        dt = date(year if m != 1 else year+1, m, d)
+        dt_next = date(year if JIEQI[(i+1)%12][0] != 1 else year+1, JIEQI[(i+1)%12][0], JIEQI[(i+1)%12][1])
+        if dt <= bd < dt_next:
+            return branch
+    return "寅"
 
-            if hour_val is not None and minute_val is not None:
-                shizhi_dz = get_shizhi(hour_val, minute_val)
-                shigan = get_shigan(rizhu[0], shizhi_dz)
-                shizhu = shigan + shizhi_dz
-            else:
-                shizhu = "未知"
+def month_stem_by_fihu_dun(year_tg, month_branch):
+    if year_tg in ("甲","己"): first = "丙"
+    elif year_tg in ("乙","庚"): first = "戊"
+    elif year_tg in ("丙","辛"): first = "庚"
+    elif year_tg in ("丁","壬"): first = "壬"
+    elif year_tg in ("戊","癸"): first = "甲"
+    else: first = "丙"
+    start_idx = tiangan.index(first)
+    offset = (dizhi.index(month_branch) - dizhi.index("寅")) % 12
+    tg_idx = (start_idx + offset) % 10
+    return tiangan[tg_idx] + month_branch
 
+def get_hour_branch_by_minute(hour, minute):
+    if hour is None:
+        return None
+    tot = hour*60 + (minute or 0)
+    if tot >= 23*60 or tot < 1*60:
+        return "子", 0
+    intervals = [
+        (1*60, 3*60, "丑"),
+        (3*60, 5*60, "寅"),
+        (5*60, 7*60, "卯"),
+        (7*60, 9*60, "辰"),
+        (9*60, 11*60, "巳"),
+        (11*60, 13*60, "午"),
+        (13*60, 15*60, "未"),
+        (15*60, 17*60, "申"),
+        (17*60, 19*60, "酉"),
+        (19*60, 21*60, "戌"),
+        (21*60, 23*60, "亥"),
+    ]
+    for i,(s,e,name) in enumerate(intervals):
+        if s <= tot < e:
+            return name, i+1
+    return "子", 0
+
+def time_ganzhi_by_rule(day_gz, hour, minute):
+    if hour is None or hour < 0:
+        return "不知道"
+    branch, idx = get_hour_branch_by_minute(hour, minute)
+    day_gan = day_gz[0]
+    if day_gan in ("甲","己"): start = tiangan.index("甲")
+    elif day_gan in ("乙","庚"): start = tiangan.index("丙")
+    elif day_gan in ("丙","辛"): start = tiangan.index("戊")
+    elif day_gan in ("丁","壬"): start = tiangan.index("庚")
+    elif day_gan in ("戊","癸"): start = tiangan.index("壬")
+    else: start = 0
+    tg_idx = (start + idx) % 10
+    return tiangan[tg_idx] + branch
+
+def year_ganzhi_map(start=1900, end=2100):
+    base = 1984
+    return {y: GZS_LIST[(y-base) % 60] for y in range(start, end+1)}
+
+def color_of_gan(gan_ch):
+    el = WUXING_OF_GAN.get(gan_ch, "土")
+    return WUXING_COLOR.get(el, "#000000")
+
+def color_of_dz(dz_ch):
+    el = WUXING_OF_DZ.get(dz_ch, "土")
+    return WUXING_COLOR.get(el, "#000000")
+
+def render_four_pillars_two_rows(year_p, month_p, day_p, hour_p):
+    """
+    四柱拆成两行：上行天干（五行颜色），下行地支（五行颜色）
+    """
+    pillars = [year_p, month_p, day_p, hour_p]
+    pillars = [p if p and len(p) == 2 else "  " for p in pillars]
+    tiangan_row = [p[0] for p in pillars]
+    dizhi_row = [p[1] for p in pillars]
+
+    html = "<div style='display:flex;justify-content:center;margin-bottom:10px;'>"
+    for tg in tiangan_row:
+        c = color_of_gan(tg)
+        html += f"<div style='width:60px;text-align:center;font-size:32px;font-weight:700;color:{c};margin:0 8px'>{tg}</div>"
+    html += "</div>"
+
+    html += "<div style='display:flex;justify-content:center;'>"
+    for dz in dizhi_row:
+        c = color_of_dz(dz)
+        html += f"<div style='width:60px;text-align:center;font-size:32px;font-weight:700;color:{c};margin:0 8px'>{dz}</div>"
+    html += "</div>"
+    st.markdown(html, unsafe_allow_html=True)
+
+def show_jixiong(ji_list, xiong_list, birth_year):
+    current_year = datetime.datetime.now().year
+    start = birth_year
+    end = 2100
+    ymap = year_ganzhi_map(start, end)
+
+    order_key = lambda x: GZS_LIST.index(x) if x in GZS_LIST else 999
+
+    st.subheader("🎉 吉年")
+    if not ji_list:
+        st.info("无吉年（按当前规则）")
+    else:
+        for gz in sorted(ji_list, key=order_key):
+            years = [y for y,g in ymap.items() if g == gz]
+            if not years: continue
+            years.sort()
+            past = [y for y in years if y <= current_year]
+            future = [y for y in years if y > current_year]
+            parts = []
+            for y in past:
+                parts.append(f"{y}年")
+            for y in future:
+                parts.append(f"<b>{y}年★</b>")
+            st.markdown(
+                f"<div style='padding:8px;border-left:4px solid #2e7d32;background:#f1fbf1;border-radius:6px;margin-bottom:6px;color:#145214'><b>{gz}</b>: {'，'.join(parts)}</div>",
+                unsafe_allow_html=True
+            )
+
+    st.subheader("☠️ 凶年")
+    if not xiong_list:
+        st.info("无凶年（按当前规则）")
+    else:
+        for gz in sorted(xiong_list, key=order_key):
+            years = [y for y,g in ymap.items() if g == gz]
+            if not years: continue
+            years.sort()
+            past = [y for y in years if y <= current_year]
+            future = [y for y in years if y > current_year]
+            parts = []
+            for y in past:
+                parts.append(f"{y}年")
+            for y in future:
+                parts.append(f"<b>{y}年★</b>")
+            st.markdown(
+                f"<div style='padding:8px;border-left:4px solid #8b0000;background:#fff6f6;border-radius:6px;margin-bottom:6px;color:#5b0000'><b>{gz}</b>: {'，'.join(parts)}</div>",
+                unsafe_allow_html=True
+            )
+
+# ========== Streamlit 页面 ==========
+st.set_page_config(page_title="八字排盘", layout="centered")
+st.title("八字排盘")
+
+mode = st.radio("", ["阳历生日", "直接输入四柱八字"])
+
+if mode == "阳历生日":
+    col1, col2 = st.columns([2,1])
+    with col1:
+        byear = st.number_input("出生年", min_value=1900, max_value=2100, value=1990, step=1)
+        bmonth = st.number_input("出生月（数字）", min_value=1, max_value=12, value=5, step=1)
+        bday = st.number_input("出生日", min_value=1, max_value=31, value=18, step=1)
+    with col2:
+        unknown_time = st.checkbox("时辰未知（跳过时柱）", value=False)
+        if unknown_time:
+            bhour = -1
+            bmin = 0
         else:
-            nianzhu = year_zhu
-            yuezhu = month_zhu
-            rizhu = day_zhu
-            shizhu = time_zhu
+            bhour = st.number_input("小时（0-23）", min_value=0, max_value=23, value=8, step=1)
+            bmin = st.number_input("分钟（0-59）", min_value=0, max_value=59, value=0, step=1)
 
-        # 显示八字，天干一行，地支一行，五行色
-        st.subheader("四柱八字")
-        tg_line = nianzhu[0] + yuezhu[0] + rizhu[0] + (shizhu[0] if shizhu != "未知" else "")
-        dz_line = nianzhu[1] + yuezhu[1] + rizhu[1] + (shizhu[1] if shizhu != "未知" else "")
+    if st.button("推算八字并查询吉凶"):
+        hour_val = None if bhour == -1 else int(bhour)
+        min_val = None if bhour == -1 else int(bmin)
+        try:
+            year_p, adj_year = year_ganzhi(byear, bmonth, bday, hour_val or 0, min_val or 0)
+            day_p = day_ganzhi_by_anchor(byear, bmonth, bday, hour_val)
+            mb = get_month_branch(byear, bmonth, bday)
+            month_p = month_stem_by_fihu_dun(year_p[0], mb)
+            hour_p = "不知道" if hour_val is None else time_ganzhi_by_rule(day_p, hour_val, min_val or 0)
 
-        def show_bazi_line(chars):
-            res = ""
-            spacing = " " * 4  # 加大间距，中文空格
-            for c in chars:
-                res += colorize(c) + spacing
-            return res
+            st.markdown("## 推算结果（四柱）")
+            render_four_pillars_two_rows(year_p, month_p, day_p, hour_p)
 
-        st.markdown(f"<div style='font-size:40px'>{show_bazi_line(tg_line)}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='font-size:40px'>{show_bazi_line(dz_line)}</div>", unsafe_allow_html=True)
+            ji, xiong = analyze_bazi(year_p, month_p, day_p, hour_p)
+            st.markdown("---")
+            show_jixiong(ji, xiong, byear)
+        except Exception as e:
+            st.error(f"计算出错：{e}")
 
-        # 生成吉凶年份数据
-        current_year = datetime.now().year
-        start_year = year if mode == "阳历生日" else 1900
-        year_map = year_ganzhi_map(start_year, 2100)
+else:
+    st.markdown("请直接输入四柱八字（例如：庚午、辛巳），时柱可填“不知道”以跳过。")
+    nianzhu = st.text_input("年柱", max_chars=2)
+    yuezhu = st.text_input("月柱", max_chars=2)
+    rizhu = st.text_input("日柱", max_chars=2)
+    shizhu = st.text_input("时柱", max_chars=2)
+    start_year = st.number_input("用于列出吉凶年份的起始年（例如出生年）", min_value=1600, max_value=2100, value=1990, step=1)
 
-        # 简单吉凶分类：按天干地支组合分组，这里示范使用固定吉凶列表
-        all_ji = ["甲子", "乙丑", "丙寅", "丁卯", "戊辰"]  # 示例吉年干支，真实可用你的业务逻辑替换
-        all_xiong = ["己巳", "庚午", "辛未", "壬申", "癸酉"]  # 示例凶年干支
-
-        # 吉年输出
-        st.subheader("吉年")
-        for gz in sorted(all_ji, key=lambda x: ganzhi60.index(x) if x in ganzhi60 else 999):
-            years = [y for y, gz_y in year_map.items() if gz_y == gz and y >= start_year]
-            if years:
-                year_strs = []
-                for y in years:
-                    if y > current_year:
-                        year_strs.append(f"{y}年★")
-                    else:
-                        year_strs.append(f"{y}年")
-                st.markdown(
-                    f"<span style='color:green; font-weight:bold'>{gz}: {', '.join(year_strs)}</span>",
-                    unsafe_allow_html=True
-                )
-
-        # 凶年输出
-        st.subheader("凶年")
-        for gz in sorted(all_xiong, key=lambda x: ganzhi60.index(x) if x in ganzhi60 else 999):
-            years = [y for y, gz_y in year_map.items() if gz_y == gz and y >= start_year]
-            if years:
-                year_strs = []
-                for y in years:
-                    if y > current_year:
-                        year_strs.append(f"{y}年★")
-                    else:
-                        year_strs.append(f"{y}年")
-                st.markdown(
-                    f"<span style='color:red; font-weight:bold'>{gz}: {', '.join(year_strs)}</span>",
-                    unsafe_allow_html=True
-                )
-
-if __name__ == "__main__":
-    main()
+    if st.button("分析吉凶"):
+        try:
+            ji, xiong = analyze_bazi(nianzhu.strip(), yuezhu.strip(), rizhu.strip(), shizhu.strip())
+            st.markdown("## 你输入的四柱（天干地支分两行）")
+            render_four_pillars_two_rows(nianzhu.strip() or "  ", yuezhu.strip() or "  ", rizhu.strip() or "  ", shizhu.strip() or "  ")
+            st.markdown("---")
+            show_jixiong(ji, xiong, int(start_year))
+        except Exception as e:
+            st.error(f"计算出错：{e}")
