@@ -30,7 +30,7 @@ def render_four_pillars_two_rows(year_p, month_p, day_p, hour_p):
     st.markdown(html, unsafe_allow_html=True)
 
 # ========== Streamlit 页面 ==========
-st.set_page_config(page_title="八字排盘", layout="centered")
+st.set_page_config(page_title="吉凶推算", layout="centered")
 st.title("吉凶推算")
 
 mode = st.radio("", ["阳历生日", "直接输入四柱八字"])
