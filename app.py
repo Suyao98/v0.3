@@ -140,26 +140,6 @@ def time_ganzhi_by_rule(day_gz, hour, minute):
     tg_idx = (start + idx) % 10
     return tiangan[tg_idx] + branch
 
-# 简易阴历转阳历推算，基于农历数据2020-2040（注意这只是示例，实际推荐用专业库）
-# 用于演示，未覆盖所有年份和闰月。这里只支持非闰月，且月份天数参考农历常规。
-def lunar_to_solar_simple(l_year, l_month, l_day, is_leap_month=False):
-    # 2020年农历正月初一对应公历2020-01-25
-    # 以2020年为基准，往后推算简化
-    base_lunar_new_year = date(2020,1,25)
-    base_year = 2020
-    if is_leap_month:
-        return None  # 简化版本不支持闰月
-    # 月份天数示例（不准确，仅做示例）
-    lunar_month_days = [30,29,30,29,30,29,30,29,30,29,30,29]
-    # 计算偏移天数
-    year_diff = l_year - base_year
-    days_offset = year_diff * 354 + (year_diff//4)  # 简化润年影响
-    for i in range(l_month-1):
-        days_offset += lunar_month_days[i%12]
-    days_offset += (l_day - 1)
-    solar_date = base_lunar_new_year + timedelta(days=days_offset)
-    return solar_date.year, solar_date.month, solar_date.day
-
 def year_ganzhi_map(start=1900, end=2100):
     base_year = 1984
     return {y: GZS_LIST[(y-base_year)%60] for y in range(start, end+1)}
@@ -170,7 +150,7 @@ def show_result_beauty(ji_list, xiong_list, birth_year):
     cur = birth_year if birth_year >= now_year else now_year
     color_good = "#b22222"
     color_bad = "#555555"
-    st.markdown("### 🎉 吉年")
+    st.markdown("### 吉年")
     if not ji_list:
         st.info("无吉年（按当前规则）")
     else:
@@ -180,12 +160,12 @@ def show_result_beauty(ji_list, xiong_list, birth_year):
             years.sort()
             parts=[]
             for y in years:
-                s = f"{gz}{y}年"
-                if y == cur:
-                    s = f"**{s} （当前或出生年）**"
+                s = f"{y}"
+                if y >= cur:
+                    s = f"**{s}**"
                 parts.append(s)
-            st.markdown(f"<div style='color:{color_good};padding:8px;border-left:5px solid {color_good};background:#ffe6e6;border-radius:6px;margin-bottom:6px'>{gz}: {'，'.join(parts)}</div>", unsafe_allow_html=True)
-    st.markdown("### ☠️ 凶年")
+            st.markdown(f"<div style='color:{color_good};padding:8px;border-left:5px solid {color_good};background:#fff0f0;border-radius:6px;margin-bottom:6px'>{gz}: {'，'.join(parts)}</div>", unsafe_allow_html=True)
+    st.markdown("### 凶年")
     if not xiong_list:
         st.info("无凶年（按当前规则）")
     else:
@@ -195,16 +175,16 @@ def show_result_beauty(ji_list, xiong_list, birth_year):
             years.sort()
             parts=[]
             for y in years:
-                s = f"{gz}{y}年"
-                if y == cur:
-                    s = f"**{s} （当前或出生年）**"
+                s = f"{y}"
+                if y >= cur:
+                    s = f"**{s}**"
                 parts.append(s)
             st.markdown(f"<div style='color:{color_bad};padding:8px;border-left:5px solid {color_bad};background:#f7f7f7;border-radius:6px;margin-bottom:6px'>{gz}: {'，'.join(parts)}</div>", unsafe_allow_html=True)
 
 st.set_page_config(page_title="八字排盘", layout="centered")
 st.title("八字排盘")
 
-input_mode = st.radio("", ["阳历生日", "阴历生日", "直接输入四柱八字"])
+input_mode = st.radio("", ["阳历生日", "直接输入四柱八字"])
 
 if input_mode == "阳历生日":
     col1, col2 = st.columns([2,1])
@@ -245,52 +225,6 @@ if input_mode == "阳历生日":
         except Exception as e:
             st.error(f"计算出错：{e}")
 
-elif input_mode == "阴历生日":
-    col1, col2 = st.columns([2,1])
-    with col1:
-        ly = st.number_input("农历年", min_value=1900, max_value=2100, value=1990, step=1)
-        lm = st.number_input("农历月", min_value=1, max_value=12, value=1, step=1)
-        ld = st.number_input("农历日", min_value=1, max_value=30, value=1, step=1)
-        isleap = st.checkbox("闰月", value=False)
-    with col2:
-        unknown_time = st.checkbox("时辰未知（跳过时柱）", value=False)
-        if unknown_time:
-            bhour = -1
-            bmin = 0
-        else:
-            bhour = st.number_input("小时（0-23）", min_value=0, max_value=23, value=8, step=1)
-            bmin = st.number_input("分钟（0-59）", min_value=0, max_value=59, value=0, step=1)
-
-    if st.button("阴历转阳历并推算八字"):
-        solar_date = lunar_to_solar_simple(ly, lm, ld, isleap)
-        if solar_date is None:
-            st.error("暂不支持闰月或超出范围的阴历转换，请重新输入。")
-            st.stop()
-        sy, sm, sd = solar_date
-        hour_val = None if bhour == -1 else int(bhour)
-        min_val = None if bhour == -1 else int(bmin)
-        try:
-            year_p, adj_year = year_ganzhi(sy, sm, sd, hour_val or 0, min_val or 0)
-            day_p = day_ganzhi_by_anchor(sy, sm, sd, hour_val)
-            mb = get_month_branch(sy, sm, sd)
-            month_p = month_stem_by_fihu_dun(year_p[0], mb)
-            if hour_val is None:
-                hour_p = "不知道"
-            else:
-                hour_p = time_ganzhi_by_rule(day_p, hour_val, min_val or 0)
-            bazi = {"year": year_p, "month": month_p, "day": day_p, "hour": hour_p}
-
-            st.markdown(f"转换后的阳历日期：{sy}年{sm}月{sd}日")
-            st.markdown("## 推算结果（四柱）")
-            st.markdown(f"<div style='font-size:20px;line-height:1.6;padding:10px 20px;border-radius:10px;border:2px solid #b22222;background:#fff0f0;text-align:center;'>"
-                        f"年柱：<b>{bazi['year']}</b>  &nbsp;&nbsp; 月柱：<b>{bazi['month']}</b>  &nbsp;&nbsp; 日柱：<b>{bazi['day']}</b>  &nbsp;&nbsp; 时柱：<b>{bazi['hour']}</b>"
-                        f"</div>", unsafe_allow_html=True)
-            ji, xiong = analyze_bazi(bazi["year"], bazi["month"], bazi["day"], bazi["hour"])
-            st.markdown("---")
-            show_result_beauty(ji, xiong, adj_year)
-        except Exception as e:
-            st.error(f"计算出错：{e}")
-
 else:  # 直接输入四柱八字
     st.markdown("请直接输入四柱八字（每柱两个字符，天干+地支），不输入则自动不计入分析。")
     nianzhu = st.text_input("年柱", max_chars=2)
@@ -303,10 +237,11 @@ else:  # 直接输入四柱八字
             ji, xiong = analyze_bazi(nianzhu.strip(), yuezhu.strip(), rizhu.strip(), shizhu.strip())
             st.markdown("## 输入八字四柱")
             st.markdown(f"年柱：{nianzhu}  月柱：{yuezhu}  日柱：{rizhu}  时柱：{shizhu}")
-            byear = 1900
-            show_result_beauty(ji, xiong, byear)
+            # 如果日柱有效，则尝试用日柱天干推算出生年，没法确定用默认1990
+            birth_year = 1990
+            if rizhu and len(rizhu) == 2:
+                # 简单反推年份: 假设日柱与出生年关联不严谨，固定默认
+                birth_year = 1990
+            show_result_beauty(ji, xiong, birth_year)
         except Exception as e:
             st.error(f"计算出错：{e}")
-
-st.markdown("---")
-st.markdown("程序默认以锚点日法（日柱）与五鼠遁时柱规则为主。阴历转阳历为简化演示，适用于部分年份。")
