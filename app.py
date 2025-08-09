@@ -250,10 +250,10 @@ def show_jixiong(ji_list, xiong_list, birth_year):
             )
 
 # ========== Streamlit 页面 ==========
-st.set_page_config(page_title="八字排盘", layout="centered")
-st.title("八字排盘")
+st.set_page_config(page_title="流年吉凶", layout="centered")
+st.title("流年吉凶")
 
-mode = st.radio("", ["阳历生日", "直接输入四柱八字"])
+mode = st.radio("", ["阳历生日", "四柱八字"])
 
 if mode == "阳历生日":
     col1, col2 = st.columns([2,1])
@@ -270,7 +270,7 @@ if mode == "阳历生日":
             bhour = st.number_input("小时（0-23）", min_value=0, max_value=23, value=8, step=1)
             bmin = st.number_input("分钟（0-59）", min_value=0, max_value=59, value=0, step=1)
 
-    if st.button("推算八字并查询吉凶"):
+    if st.button("查询吉凶"):
         hour_val = None if bhour == -1 else int(bhour)
         min_val = None if bhour == -1 else int(bmin)
         try:
@@ -280,7 +280,7 @@ if mode == "阳历生日":
             month_p = month_stem_by_fihu_dun(year_p[0], mb)
             hour_p = "不知道" if hour_val is None else time_ganzhi_by_rule(day_p, hour_val, min_val or 0)
 
-            st.markdown("## 推算结果（四柱）")
+            st.markdown("## 四柱八字")
             render_four_pillars_two_rows(year_p, month_p, day_p, hour_p)
 
             ji, xiong = analyze_bazi(year_p, month_p, day_p, hour_p)
