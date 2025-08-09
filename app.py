@@ -300,7 +300,7 @@ else:
     if st.button("分析吉凶"):
         try:
             ji, xiong = analyze_bazi(nianzhu.strip(), yuezhu.strip(), rizhu.strip(), shizhu.strip())
-            st.markdown("## 你输入的四柱（天干地支分两行）")
+            st.markdown("## 你输入的四柱")
             render_four_pillars_two_rows(nianzhu.strip() or "  ", yuezhu.strip() or "  ", rizhu.strip() or "  ", shizhu.strip() or "  ")
             st.markdown("---")
             show_jixiong(ji, xiong, int(start_year))
