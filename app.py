@@ -247,46 +247,44 @@ def main():
             hour = None
             minute = None
 
-        nianzhu, yuezhu, rizhu, shizhu = analyze_bazi(year, month, day, hour, minute)
-
     else:
         year_zhu = st.text_input("年柱（例如：甲子）")
         month_zhu = st.text_input("月柱（例如：乙丑）")
         day_zhu = st.text_input("日柱（例如：丙寅）")
         time_zhu = st.text_input("时柱（例如：丁卯，未知可留空）")
 
-        # 简单验证长度
-        if len(year_zhu) != 2 or len(month_zhu) != 2 or len(day_zhu) != 2:
-            st.error("请输入正确的四柱，每柱为两个字符")
-            return
+    if st.button("推算"):
+        if mode == "阳历生日":
+            nianzhu, yuezhu, rizhu, shizhu = analyze_bazi(year, month, day, hour, minute)
+        else:
+            if len(year_zhu) != 2 or len(month_zhu) != 2 or len(day_zhu) != 2:
+                st.error("请输入正确的四柱，每柱为两个字符")
+                return
+            shizhu = time_zhu if len(time_zhu) == 2 else "未知"
+            nianzhu, yuezhu, rizhu = year_zhu, month_zhu, day_zhu
 
-        shizhu = time_zhu if len(time_zhu) == 2 else "未知"
+        st.subheader("推算八字")
 
-        nianzhu, yuezhu, rizhu = year_zhu, month_zhu, day_zhu
+        def colorize(char):
+            w = wuxing_map.get(char, "土")
+            color_dict = {
+                "木": "#228B22",
+                "火": "#FF4500",
+                "土": "#DAA520",
+                "金": "#1E90FF",
+                "水": "#00CED1",
+            }
+            return f"<span style='color:{color_dict[w]};font-weight:bold'>{char}</span>"
 
-    st.subheader("推算八字")
-    # 分两行显示 天干一行，地支一行，颜色按五行
+        def show_bazi_line(chars):
+            return "".join([colorize(c) for c in chars])
 
-    def colorize(char):
-        w = wuxing_map.get(char, "土")
-        color_dict = {
-            "木": "#228B22",   # 深绿
-            "火": "#FF4500",   # 橙红
-            "土": "#DAA520",   # 金黄
-            "金": "#1E90FF",   # DodgerBlue
-            "水": "#00CED1",   # DarkTurquoise
-        }
-        return f"<span style='color:{color_dict[w]}'>{char}</span>"
+        tg_chars = nianzhu[0] + yuezhu[0] + rizhu[0] + (shizhu[0] if shizhu != "未知" else "")
+        dz_chars = nianzhu[1] + yuezhu[1] + rizhu[1] + (shizhu[1] if shizhu != "未知" else "")
 
-    def show_bazi_line(chars):
-        return "".join([colorize(c) for c in chars])
-
-    tg_line = show_bazi_line(nianzhu[0] + yuezhu[0] + rizhu[0] + shizhu[0] if shizhu != "未知" else nianzhu[0] + yuezhu[0] + rizhu[0])
-    dz_line = show_bazi_line(nianzhu[1] + yuezhu[1] + rizhu[1] + shizhu[1] if shizhu != "未知" else nianzhu[1] + yuezhu[1] + rizhu[1])
-
-    st.markdown(f"<div style='font-size:30px'>{tg_line}</div>", unsafe_allow_html=True)
-    st.markdown(f"<div style='font-size:30px'>{dz_line}</div>", unsafe_allow_html=True)
-
+        st.markdown(f"<div style='font-size:40px; letter-spacing:20px'>{show_bazi_line(tg_chars)}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='font-size:40px; letter-spacing:20px'>{show_bazi_line(dz_chars)}</div>", unsafe_allow_html=True)
+        
     # 吉凶推算
     zhus = [nianzhu, yuezhu, rizhu]
     if shizhu != "未知":
